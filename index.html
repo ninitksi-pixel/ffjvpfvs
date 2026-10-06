@@ -1,0 +1,605 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Генератор статей · DeepSeek</title>
+<style>
+  :root {
+    --bg: #0f172a;
+    --card: #1e293b;
+    --card-2: #273449;
+    --text: #e2e8f0;
+    --muted: #94a3b8;
+    --accent: #38bdf8;
+    --green: #34d399;
+    --border: #334155;
+    --danger: #f87171;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.55;
+  }
+  header {
+    padding: 28px 20px 14px;
+    text-align: center;
+    border-bottom: 1px solid var(--border);
+  }
+  header h1 { margin: 0 0 6px; font-size: 26px; }
+  header p { margin: 0; color: var(--muted); font-size: 14px; }
+  main {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 22px 20px 60px;
+  }
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 18px;
+    margin-bottom: 18px;
+  }
+  .card h2 {
+    margin: 0 0 12px;
+    font-size: 16px;
+    color: var(--accent);
+    font-weight: 600;
+    letter-spacing: .3px;
+  }
+  label {
+    display: block;
+    font-size: 13px;
+    color: var(--muted);
+    margin: 10px 0 5px;
+  }
+  input[type=text], input[type=password], input[type=number], select {
+    width: 100%;
+    padding: 10px 12px;
+    background: var(--card-2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    font-size: 14px;
+    font-family: inherit;
+  }
+  input:focus, select:focus {
+    outline: none;
+    border-color: var(--accent);
+  }
+  .row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+  }
+  @media (max-width: 560px) {
+    .row { grid-template-columns: 1fr; }
+  }
+  button {
+    background: var(--accent);
+    color: #0b1220;
+    border: none;
+    border-radius: 8px;
+    padding: 11px 18px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: filter .15s;
+    font-family: inherit;
+  }
+  button:hover:not(:disabled) { filter: brightness(1.1); }
+  button:disabled {
+    opacity: .5;
+    cursor: not-allowed;
+  }
+  button.secondary {
+    background: var(--card-2);
+    color: var(--text);
+    border: 1px solid var(--border);
+  }
+  .actions {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-top: 16px;
+  }
+  .status {
+    font-size: 13px;
+    color: var(--muted);
+    margin-top: 10px;
+    min-height: 18px;
+  }
+  .status.error { color: var(--danger); }
+  .status.ok { color: var(--green); }
+  .titles-list {
+    list-style: none;
+    padding: 0;
+    margin: 12px 0 0;
+    display: none;
+  }
+  .titles-list li {
+    padding: 10px 12px;
+    background: var(--card-2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    margin-bottom: 8px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: border-color .15s;
+  }
+  .titles-list li:hover { border-color: var(--accent); }
+  .titles-list li.selected {
+    border-color: var(--accent);
+    background: rgba(56,189,248,.1);
+  }
+  .titles-list li .num {
+    color: var(--muted);
+    margin-right: 8px;
+  }
+  #article {
+    display: none;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 22px;
+    margin-top: 18px;
+  }
+  #article h1 {
+    color: var(--accent);
+    margin-top: 0;
+    font-size: 24px;
+    line-height: 1.3;
+  }
+  #article h2 {
+    color: var(--text);
+    margin-top: 22px;
+    font-size: 18px;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 6px;
+  }
+  #article p { margin: 10px 0; }
+  .filename {
+    color: var(--green);
+    font-family: ui-monospace, Menlo, monospace;
+    font-size: 13px;
+    margin-top: 12px;
+    word-break: break-all;
+  }
+  .hint {
+    font-size: 12px;
+    color: var(--muted);
+    margin-top: 6px;
+  }
+  .hint a { color: var(--accent); }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Генератор статей</h1>
+  <p>План → разделы → сохранение в .md. Модель: deepseek-chat.</p>
+</header>
+
+<main>
+
+  <!-- API-ключ -->
+  <div class="card">
+    <h2>1. Ключ DeepSeek</h2>
+    <label for="apiKey">API-ключ (хранится только в этом браузере)</label>
+    <input type="password" id="apiKey" placeholder="sk-..." autocomplete="off">
+    <div class="hint">
+      Ключ не уходит никуда, кроме api.deepseek.com, и сохраняется в localStorage
+      вашего браузера. Получить:
+      <a href="https://platform.deepseek.com/api_keys" target="_blank" rel="noopener">platform.deepseek.com/api_keys</a>
+    </div>
+  </div>
+
+  <!-- Тема и параметры -->
+  <div class="card">
+    <h2>2. Тема и параметры</h2>
+    <label for="topic">Тема статьи</label>
+    <input type="text" id="topic" placeholder="Например: Городские пчёлы на крышах">
+
+    <div class="row">
+      <div>
+        <label for="style">Стиль</label>
+        <select id="style">
+          <option value="news">новость</option>
+          <option value="pop" selected>научпоп</option>
+          <option value="social">пост для соцсети</option>
+          <option value="fairy">сказка</option>
+        </select>
+      </div>
+      <div>
+        <label for="temperature">Temperature (0.0–1.5)</label>
+        <input type="number" id="temperature" value="0.7" min="0" max="1.5" step="0.1">
+      </div>
+    </div>
+
+    <div class="actions">
+      <button id="btnTitles">Предложить заголовки</button>
+      <button id="btnArticle" disabled>Сгенерировать статью</button>
+    </div>
+    <div class="status" id="status"></div>
+  </div>
+
+  <!-- Заголовки -->
+  <div class="card" id="titlesCard" style="display:none;">
+    <h2>3. Выберите заголовок</h2>
+    <ul class="titles-list" id="titlesList"></ul>
+    <div class="actions">
+      <button id="btnMoreTitles" class="secondary">Ещё 5 вариантов</button>
+    </div>
+  </div>
+
+  <!-- Статья -->
+  <article id="article"></article>
+  <div class="actions" id="saveActions" style="display:none;">
+    <button id="btnDownload">Скачать .md</button>
+    <button id="btnCopy" class="secondary">Скопировать текст</button>
+  </div>
+
+</main>
+
+<script>
+"use strict";
+
+// --------------------------------------------------------------
+// Стили: системная роль + лимит токенов на раздел.
+// Тот же словарь, что был в Python, только на JS.
+// --------------------------------------------------------------
+const STYLES = {
+  news: {
+    name: "новость",
+    role: "Ты репортёр новостного агентства. Пишешь сухо, фактологично, " +
+          "без эпитетов и личного мнения. Каждое утверждение — по делу. " +
+          "Структура: подзаголовок, затем 2–3 коротких абзаца.",
+    maxTokens: 300,
+  },
+  pop: {
+    name: "научпоп",
+    role: "Ты автор научно-популярных статей. Объясняешь сложное простыми " +
+          "словами, приводишь аналогии и примеры из жизни, но не упрощаешь " +
+          "до искажения. Структура: подзаголовок, затем 2–3 абзаца.",
+    maxTokens: 500,
+  },
+  social: {
+    name: "пост для соцсети",
+    role: "Ты автор вирусных постов для соцсетей. Пишешь живо, короткими " +
+          "фразами, с эмодзи по вкусу, обращаешься к читателю на «ты». " +
+          "Структура: подзаголовок-крючок, затем 2–3 коротких абзаца.",
+    maxTokens: 220,
+  },
+  fairy: {
+    name: "сказка",
+    role: "Ты сказочник. Пишешь в духе народной сказки: с зачином «жили-были», " +
+          "повторами, живыми образами и моралью в конце. Но по сути — " +
+          "про реальную тему, без выдуманных фактов. " +
+          "Структура: подзаголовок, затем 2–3 абзаца.",
+    maxTokens: 400,
+  },
+};
+
+const PLAN_SYSTEM =
+  "Ты редактор. По теме статьи составь план из 3–4 разделов. " +
+  "Ответ — строго нумерованный список, каждая строка: «1. Название раздела». " +
+  "Без вступлений, без пояснений, без текста самой статьи.";
+
+const TITLES_SYSTEM =
+  "Ты редактор. Придумай ровно 5 разных вариантов заголовка для статьи " +
+  "по заданной теме. Заголовки — короткие (до 80 символов), цепляющие, " +
+  "без кавычек вокруг всего заголовка. " +
+  "Ответ — строго нумерованный список, каждая строка: «1. Заголовок». " +
+  "Без пояснений и без текста статьи.";
+
+const API_URL = "https://api.deepseek.com/chat/completions";
+const MODEL   = "deepseek-chat";
+
+// --------------------------------------------------------------
+// Ссылки на элементы страницы
+// --------------------------------------------------------------
+const $ = id => document.getElementById(id);
+const elApiKey      = $("apiKey");
+const elTopic       = $("topic");
+const elStyle       = $("style");
+const elTemp        = $("temperature");
+const elStatus      = $("status");
+const elBtnTitles   = $("btnTitles");
+const elBtnArticle  = $("btnArticle");
+const elBtnMore     = $("btnMoreTitles");
+const elTitlesCard  = $("titlesCard");
+const elTitlesList  = $("titlesList");
+const elArticle     = $("article");
+const elSaveActions = $("saveActions");
+const elBtnDownload = $("btnDownload");
+const elBtnCopy     = $("btnCopy");
+
+// --------------------------------------------------------------
+// Состояние
+// --------------------------------------------------------------
+let state = {
+  titles: [],           // предложенные заголовки
+  chosenTitle: "",      // выбранный пользователем
+  sectionTitles: [],    // план статьи
+  articleMd: "",        // готовый markdown
+  busy: false,          // защита от двойных кликов
+};
+
+// --------------------------------------------------------------
+// API-ключ: подгружаем из localStorage, сохраняем при вводе.
+// --------------------------------------------------------------
+elApiKey.value = localStorage.getItem("deepseek_key") || "";
+elApiKey.addEventListener("input", () => {
+  localStorage.setItem("deepseek_key", elApiKey.value.trim());
+});
+
+// --------------------------------------------------------------
+// Вспомогательное: сообщения статуса
+// --------------------------------------------------------------
+function setStatus(text, kind) {
+  elStatus.textContent = text || "";
+  elStatus.className = "status" + (kind ? " " + kind : "");
+}
+
+function setBusy(b) {
+  state.busy = b;
+  elBtnTitles.disabled = b;
+  elBtnArticle.disabled = b || !state.chosenTitle;
+  elBtnMore.disabled = b;
+}
+
+// --------------------------------------------------------------
+// Главный запрос к DeepSeek через fetch.
+// OpenAI-совместимый формат, как и в Python-версии.
+// --------------------------------------------------------------
+async function ask(systemPrompt, userPrompt, temperature, maxTokens) {
+  const key = elApiKey.value.trim();
+  if (!key) throw new Error("Сначала введите API-ключ DeepSeek.");
+
+  const resp = await fetch(API_URL, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": "Bearer " + key,
+    },
+    body: JSON.stringify({
+      model: MODEL,
+      temperature: temperature,
+      max_tokens: maxTokens,
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user",   content: userPrompt   },
+      ],
+    }),
+  });
+
+  if (!resp.ok) {
+    const errText = await resp.text();
+    throw new Error("DeepSeek вернул " + resp.status + ": " + errText.slice(0, 300));
+  }
+  const data = await resp.json();
+  return data.choices[0].message.content;
+}
+
+// --------------------------------------------------------------
+// Разбор нумерованного списка. Тот же алгоритм, что в Python.
+// «1. X» / «1) X» / «- X» → ["X", ...]
+// --------------------------------------------------------------
+function parseNumberedList(text) {
+  const out = [];
+  for (let raw of text.split("\n")) {
+    let line = raw.trim();
+    if (!line) continue;
+
+    for (const prefix of ["- ", "* "]) {
+      if (line.startsWith(prefix)) line = line.slice(prefix.length).trim();
+    }
+
+    // «1. X» или «1) X»
+    let m = line.match(/^(\d+)\s*[\.\)]\s*(.+)$/);
+    if (m) {
+      out.push(m[2].trim());
+      continue;
+    }
+    // одиночная цифра без разделителя — маловероятно, но на всякий случай
+    m = line.match(/^(\d+)\s+(.+)$/);
+    if (m) {
+      out.push(m[2].trim());
+      continue;
+    }
+    out.push(line);
+  }
+  return out;
+}
+
+// --------------------------------------------------------------
+// Шаг 1. Заголовки
+// --------------------------------------------------------------
+async function fetchTitles(append) {
+  const topic = elTopic.value.trim();
+  if (!topic) { setStatus("Введите тему статьи.", "error"); return; }
+
+  setBusy(true);
+  setStatus("Придумываю заголовки…");
+  try {
+    const t = parseFloat(elTemp.value) || 0.7;
+    const text = await ask(TITLES_SYSTEM, "Тема: " + topic, t, 250);
+    const titles = parseNumberedList(text);
+    state.titles = append ? state.titles.concat(titles) : titles;
+    renderTitles();
+    elTitlesCard.style.display = "";
+    setStatus("Готово. Выберите заголовок — или сгенерируйте ещё.", "ok");
+  } catch (e) {
+    setStatus(e.message, "error");
+  } finally {
+    setBusy(false);
+  }
+}
+
+function renderTitles() {
+  elTitlesList.innerHTML = "";
+  state.titles.forEach((title, i) => {
+    const li = document.createElement("li");
+    li.innerHTML = '<span class="num">' + (i + 1) + '.</span>';
+    li.appendChild(document.createTextNode(title));
+    if (title === state.chosenTitle) li.classList.add("selected");
+    li.addEventListener("click", () => {
+      state.chosenTitle = title;
+      document.querySelectorAll(".titles-list li").forEach(x => x.classList.remove("selected"));
+      li.classList.add("selected");
+      elBtnArticle.disabled = state.busy;
+    });
+    elTitlesList.appendChild(li);
+  });
+  elTitlesList.style.display = "";
+}
+
+// --------------------------------------------------------------
+// Шаг 2. Полная статья: план + каждый раздел отдельно.
+// --------------------------------------------------------------
+async function generateArticle() {
+  const topic = elTopic.value.trim();
+  if (!topic) { setStatus("Введите тему статьи.", "error"); return; }
+  if (!state.chosenTitle) { setStatus("Сначала выберите заголовок.", "error"); return; }
+
+  const style = STYLES[elStyle.value];
+  const t = parseFloat(elTemp.value) || 0.7;
+
+  setBusy(true);
+  elArticle.style.display = "none";
+  elSaveActions.style.display = "none";
+  setStatus("Составляю план…");
+
+  try {
+    // --- план
+    const planText = await ask(PLAN_SYSTEM, "Тема: " + topic, t, 200);
+    const sections = parseNumberedList(planText);
+    if (!sections.length) throw new Error("Модель не вернула план.");
+    state.sectionTitles = sections;
+
+    // --- разделы
+    const parts = [];
+    for (let i = 0; i < sections.length; i++) {
+      setStatus("Пишу раздел " + (i + 1) + " из " + sections.length + "…");
+      const userPrompt =
+        "Тема статьи: " + topic + "\n" +
+        "Раздел " + (i + 1) + " из " + sections.length + ": " + sections[i] + "\n\n" +
+        "Напиши только этот раздел — с подзаголовком, без общего " +
+        "введения и без вывода по всей статье.";
+      const body = await ask(style.role, userPrompt, t, style.maxTokens);
+      parts.push(body);
+    }
+
+    // --- собираем markdown
+    state.articleMd = "# " + state.chosenTitle + "\n\n" + parts.join("\n\n") + "\n";
+    renderArticle(state.articleMd);
+
+    elSaveActions.style.display = "";
+    setStatus("Статья готова.", "ok");
+  } catch (e) {
+    setStatus(e.message, "error");
+  } finally {
+    setBusy(false);
+  }
+}
+
+// --------------------------------------------------------------
+// Простейший markdown → HTML. Хватает для "# H1", "## H2" и абзацев.
+// --------------------------------------------------------------
+function escapeHtml(s) {
+  return s.replace(/[&<>"']/g, ch => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+  }[ch]));
+}
+
+function renderArticle(md) {
+  const lines = md.split("\n");
+  let html = "";
+  let para = [];
+
+  const flushPara = () => {
+    if (para.length) {
+      html += "<p>" + escapeHtml(para.join(" ")) + "</p>";
+      para = [];
+    }
+  };
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed) { flushPara(); continue; }
+    if (trimmed.startsWith("## ")) {
+      flushPara();
+      html += "<h2>" + escapeHtml(trimmed.slice(3)) + "</h2>";
+    } else if (trimmed.startsWith("# ")) {
+      flushPara();
+      html += "<h1>" + escapeHtml(trimmed.slice(2)) + "</h1>";
+    } else {
+      para.push(trimmed);
+    }
+  }
+  flushPara();
+
+  elArticle.innerHTML = html;
+
+  // строчка с именем файла (зелёным)
+  const fname = filenameFor(elTopic.value.trim());
+  const fn = document.createElement("div");
+  fn.className = "filename";
+  fn.textContent = "Файл: " + fname;
+  elArticle.appendChild(fn);
+
+  elArticle.style.display = "";
+  elArticle.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+// --------------------------------------------------------------
+// Имя файла: stat_тема.md, безопасное. Тот же алгоритм, что в Python.
+// --------------------------------------------------------------
+function filenameFor(topic) {
+  let name = topic.toLowerCase().trim();
+  name = name.replace(/\s+/g, "_");
+  // оставляем буквы (включая кириллицу), цифры, подчёркивания и дефисы
+  name = name.replace(/[^\p{L}\p{N}_\-]/gu, "");
+  name = name.replace(/^_+|_+$/g, "") || "без_темы";
+  return "stat_" + name + ".md";
+}
+
+// --------------------------------------------------------------
+// Скачивание и копирование
+// --------------------------------------------------------------
+function downloadMd() {
+  const blob = new Blob([state.articleMd], { type: "text/markdown;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filenameFor(elTopic.value.trim());
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+async function copyMd() {
+  try {
+    await navigator.clipboard.writeText(state.articleMd);
+    setStatus("Скопировано в буфер обмена.", "ok");
+  } catch {
+    setStatus("Не удалось скопировать — скачайте файл.", "error");
+  }
+}
+
+// --------------------------------------------------------------
+// Обработчики
+// --------------------------------------------------------------
+elBtnTitles.addEventListener("click", () => fetchTitles(false));
+elBtnMore.addEventListener("click",   () => fetchTitles(true));
+elBtnArticle.addEventListener("click", generateArticle);
+elBtnDownload.addEventListener("click", downloadMd);
+elBtnCopy.addEventListener("click", copyMd);
+</script>
+
+</body>
+</html>
